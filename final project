@@ -1,0 +1,142 @@
+import pandas as pd
+import mysql.connector as sql
+import plotly.express as px
+import matplotlib.pyplot as plt
+
+pd.set_option("display.max_rows",5)
+pd.set_option("display.max_columns",12)
+
+mydb = sql.connect(user="root",
+                   password="root",
+                   host="127.0.0.1"
+                   )
+
+mycursor = mydb.cursor()
+mycursor.execute("drop database if exists Final6289")
+mycursor.execute("create database Final6289")
+
+mydb = sql.connect(user="root",
+                   password="root",
+                   host="127.0.0.1",
+                   database = "Final6289"
+                   )
+
+mycursor = mydb.cursor()
+mycursor.execute("drop table if exists Final")
+
+data = pd.read_csv("master.csv")
+data = data.fillna(-1)
+
+mycursor = mydb.cursor()
+
+mycursor.execute("create table Final (country varchar(50), year int, sex varchar(6), age varchar(20), suicidesno int, population int, suicides100kpop float, countryyear varchar(50), HDIforyear float, gdpforyear bigint, gdppercapita int, generation varchar(30))")
+
+for i in range(len(data.index)):
+    mystr = "insert into Final values("
+    mystr = mystr +"'{}',".format(data.iloc[i,0])
+    mystr = mystr +"{},".format(data.iloc[i,1])
+    mystr = mystr +"'{}',".format(data.iloc[i,2])
+    mystr = mystr +"'{}',".format(data.iloc[i,3])
+    mystr = mystr +"{},".format(data.iloc[i,4])
+    mystr = mystr +"{},".format(data.iloc[i,5])
+    mystr = mystr +"{},".format(data.iloc[i,6])
+    mystr = mystr +"'{}',".format(data.iloc[i,7])
+    mystr = mystr +"{},".format(data.iloc[i,8])
+    mystr = mystr +"{},".format(int(data.iloc[i,9].replace(",","")))
+    mystr = mystr +"{},".format(data.iloc[i,10])
+    mystr = mystr +"'{}'".format(data.iloc[i,11])
+    mystr = mystr+")"
+    mycursor.execute(mystr)
+    mydb.commit()
+
+mydb = sql.connect(host='127.0.0.1', database='Final6289', user='root', password='root')
+db_cursor = mydb.cursor()
+db_cursor.execute('SELECT country, year, 100000*sum(suicidesno)/sum(population) FROM Final group by year,country order by year')
+table_rows = db_cursor.fetchall()
+df = pd.DataFrame(table_rows)
+df.columns = ["country", "year", "suicides100kpop"]
+df["suicides100kpop"]=df["suicides100kpop"].astype(float)
+
+fig1 = px.choropleth(df,
+                    locations="country",
+                    locationmode="country names",
+                    animation_frame="year",
+                    color = "suicides100kpop",
+                    color_continuous_scale="Viridis_r",
+                    range_color=[0,100]
+)
+fig1.show()
+
+db_cursor.execute('SELECT country, year, avg(gdppercapita)  FROM Final group by year,country order by year')
+table_rows = db_cursor.fetchall()
+df = pd.DataFrame(table_rows)
+df.columns = ["country", "year", "gdppercapita"]
+df["gdppercapita"]=df["gdppercapita"].astype(float)
+
+fig2 = px.choropleth(df,
+                    locations="country",
+                    locationmode="country names",
+                    animation_frame="year",
+                    color = "gdppercapita",
+                    color_continuous_scale="Viridis_r",
+                    range_color=[0,150000]
+)
+fig2.show()
+
+sex = ["male","female"]
+age = ["5-14 years","15-24 years","25-34 years","35-54 years","55-74 years", "75+ years"]
+
+for i in sex:
+    p = "SELECT country, year, 100000*sum(suicidesno)/sum(population) FROM Final where sex in ('{}') group by year,country order by year ".format(i)
+    db_cursor.execute(p)
+    table_rows = db_cursor.fetchall()
+    df = pd.DataFrame(table_rows)
+    df.columns = ["country", "year", "suicides100kpop"]
+    df["suicides100kpop"]=df["suicides100kpop"].astype(float)
+    fig = px.choropleth(df,
+                        locations="country",
+                        locationmode="country names",
+                        animation_frame="year",
+                        color="suicides100kpop",
+                        color_continuous_scale="Viridis_r",
+                        range_color=[0, 80],
+                        title= i
+                         )
+    fig.show()
+
+for i in age:
+    p = "SELECT country, year, 100000*sum(suicidesno)/sum(population) FROM Final where age in ('{}') group by year,country order by year ".format(i)
+    db_cursor.execute(p)
+    table_rows = db_cursor.fetchall()
+    df = pd.DataFrame(table_rows)
+    df.columns = ["country", "year", "suicides100kpop"]
+    df["suicides100kpop"]=df["suicides100kpop"].astype(float)
+    fig = px.choropleth(df,
+                        locations="country",
+                        locationmode="country names",
+                        animation_frame="year",
+                        color="suicides100kpop",
+                        color_continuous_scale="Viridis_r",
+                        range_color=[0, 80],
+                        title= i
+                         )
+    fig.show()
+
+for i in age:
+    for j in sex:
+        p = "SELECT country, year, 100000*sum(suicidesno)/sum(population) FROM Final where (age in ('{}')) and (sex in ('{}')) group by year,country order by year ".format(i,j)
+        db_cursor.execute(p)
+        table_rows = db_cursor.fetchall()
+        df = pd.DataFrame(table_rows)
+        df.columns = ["country", "year", "suicides100kpop"]
+        df["suicides100kpop"]=df["suicides100kpop"].astype(float)
+        fig = px.choropleth(df,
+                            locations="country",
+                            locationmode="country names",
+                            animation_frame="year",
+                            color="suicides100kpop",
+                            color_continuous_scale="Viridis_r",
+                            range_color=[0, 80],
+                            title= i+j
+                             )
+        fig.show()
